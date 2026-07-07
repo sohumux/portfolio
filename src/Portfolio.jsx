@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import ChatBot from "./components/ChatBot";
 import {
   Terminal,
   Cloud,
@@ -1023,7 +1024,7 @@ const fillPct =
         <div className="sm-eyebrow">// contact</div>
         <h2 className="sm-h2">Let's build something reliable</h2>
         <p style={{ color: "var(--muted)", maxWidth: "50ch" }}>
-          Available for technical assessments & interviews. Open to immediate joining, on-site in Bengaluru.
+          Available for technical assessments & interviews. Open to immediate joining, on-site in Bengaluru, Mumbai, Hyderabad.
         </p>
         <div className="sm-contact-console">
   <div className="sm-console-header">
@@ -1063,7 +1064,12 @@ const fillPct =
 </div>
       </section>
 
-      <div className="sm-footer">$ echo "thanks for scrolling" — Sohum M P, built with React</div>
-    </div>
+     <div className="sm-footer">
+  $ echo "thanks for scrolling" — Sohum M P, built with React
+</div>
+
+<ChatBot />
+
+</div>
   );
 }
