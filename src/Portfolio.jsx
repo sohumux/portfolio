@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import emailjs from "@emailjs/browser";
 import ChatBot from "./components/ChatBot";
 import {
   Terminal,
@@ -14,7 +15,21 @@ import {
   CheckCircle2,
   Circle,
   Dot,
+  Send,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
+
+// ---- EmailJS config ----
+// 1. Create a free account at https://www.emailjs.com/
+// 2. Add an Email Service (e.g. Gmail) -> copy the Service ID
+// 3. Create an Email Template with variables: {{from_name}}, {{from_email}}, {{message}}
+//    -> copy the Template ID
+// 4. Account -> General -> copy your Public Key
+// 5. Paste the three values below.
+const EMAILJS_SERVICE_ID = "service_34rcdle";
+const EMAILJS_TEMPLATE_ID = "template_wpwb8aa";
+const EMAILJS_PUBLIC_KEY = "MdLtvTlbQJ_rMz3lN";
 
 const SECTIONS = [
   { id: "home", label: "PROFILE", icon: Terminal },
@@ -282,12 +297,74 @@ function useTypewriter(lines, active) {
     done: lineIndex >= lines.length,
   };
 }
+function generateCaptcha() {
+  const a = Math.floor(Math.random() * 10) + 1;
+  const b = Math.floor(Math.random() * 10) + 1;
+  return { a, b, answer: a + b };
+}
+
 export default function Portfolio() {
   const [active, setActive] = useState("home");
   const refs = useRef({});
   const navRef = useRef(null);
   const [heroInView, setHeroInView] = useState(true);
   const { rendered: typedLines, done: typingDone } = useTypewriter(TERMINAL_LINES, heroInView);
+
+  // ---- Contact form state ----
+  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [captcha, setCaptcha] = useState(generateCaptcha);
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [sendState, setSendState] = useState("idle"); // idle | sending | success | error
+  const [formError, setFormError] = useState("");
+
+  const refreshCaptcha = useCallback(() => {
+    setCaptcha(generateCaptcha());
+    setCaptchaInput("");
+  }, []);
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    setFormError("");
+
+    if (!form.name.trim() || !form.email.trim() || !form.message.trim()) {
+      setFormError("Please fill in every field before sending.");
+      return;
+    }
+
+    if (parseInt(captchaInput, 10) !== captcha.answer) {
+      setFormError("Captcha answer is incorrect — please try again.");
+      refreshCaptcha();
+      return;
+    }
+
+    setSendState("sending");
+
+    try {
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        {
+          from_name: form.name,
+          from_email: form.email,
+          message: form.message,
+        },
+        { publicKey: EMAILJS_PUBLIC_KEY }
+      );
+
+      setSendState("success");
+      setForm({ name: "", email: "", message: "" });
+      refreshCaptcha();
+    } catch (err) {
+      console.error("EmailJS send failed:", err);
+      setSendState("error");
+      refreshCaptcha();
+    }
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -797,6 +874,120 @@ const fillPct =
     font-family:var(--mono);
 }
 
+/* CONTACT FORM */
+.sm-contact-form{
+    max-width:850px;
+    margin:24px auto 0;
+    background:#111a2e;
+    border:1px solid var(--border);
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:0 20px 50px rgba(0,0,0,.35);
+}
+
+.sm-form-body{
+    padding:24px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+
+.sm-form-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+}
+@media (max-width:600px){ .sm-form-row{ grid-template-columns:1fr; } }
+
+.sm-form-field{ display:flex; flex-direction:column; gap:6px; }
+
+.sm-form-field label{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:1px;
+    color:var(--muted);
+}
+
+.sm-form-field input,
+.sm-form-field textarea{
+    background:var(--bg-panel-alt);
+    border:1px solid var(--border-soft);
+    border-radius:8px;
+    padding:11px 13px;
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:14px;
+    resize:vertical;
+    transition:border-color .2s ease;
+}
+
+.sm-form-field input:focus,
+.sm-form-field textarea:focus{
+    outline:none;
+    border-color:var(--mint);
+}
+
+.sm-captcha-row{
+    display:flex;
+    align-items:flex-end;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.sm-captcha-challenge{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--mint);
+    background:var(--bg-panel-alt);
+    border:1px solid var(--border-soft);
+    border-radius:8px;
+    padding:11px 14px;
+    white-space:nowrap;
+}
+
+.sm-captcha-refresh{
+    background:transparent;
+    border:1px solid var(--border-soft);
+    border-radius:8px;
+    color:var(--muted);
+    padding:11px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    transition:.2s;
+}
+.sm-captcha-refresh:hover{ color:var(--mint); border-color:var(--mint); }
+
+.sm-form-error{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:#ff8080;
+    background:rgba(255,95,87,0.08);
+    border:1px solid rgba(255,95,87,0.25);
+    border-radius:8px;
+    padding:10px 14px;
+}
+
+.sm-form-success{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--mint);
+    background:rgba(94,234,212,0.08);
+    border:1px solid rgba(94,234,212,0.25);
+    border-radius:8px;
+    padding:10px 14px;
+}
+
+.sm-form-submit{
+    align-self:flex-start;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+}
+
+.sm-spin{ animation: sm-spin 1s linear infinite; }
+@keyframes sm-spin { to { transform: rotate(360deg); } }
+
 .status-dot{
     width:10px;
     height:10px;
@@ -1062,6 +1253,111 @@ const fillPct =
     Available for Immediate Joining
   </div>
 </div>
+
+        <form className="sm-contact-form" onSubmit={handleContactSubmit}>
+          <div className="sm-console-header">SEND A MESSAGE</div>
+          <div className="sm-form-body">
+            <div className="sm-form-row">
+              <div className="sm-form-field">
+                <label htmlFor="sm-name">NAME</label>
+                <input
+                  id="sm-name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  value={form.name}
+                  onChange={handleFormChange}
+                  placeholder="Your name"
+                  required
+                />
+              </div>
+              <div className="sm-form-field">
+                <label htmlFor="sm-email">EMAIL</label>
+                <input
+                  id="sm-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  value={form.email}
+                  onChange={handleFormChange}
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="sm-form-field">
+              <label htmlFor="sm-message">MESSAGE</label>
+              <textarea
+                id="sm-message"
+                name="message"
+                rows={5}
+                value={form.message}
+                onChange={handleFormChange}
+                placeholder="Tell me a bit about the role or project..."
+                required
+              />
+            </div>
+
+            <div className="sm-form-field">
+              <label htmlFor="sm-captcha">
+                CAPTCHA — what is {captcha.a} + {captcha.b}?
+              </label>
+              <div className="sm-captcha-row">
+                <input
+                  id="sm-captcha"
+                  type="number"
+                  inputMode="numeric"
+                  value={captchaInput}
+                  onChange={(e) => setCaptchaInput(e.target.value)}
+                  placeholder="Your answer"
+                  style={{ maxWidth: 160 }}
+                  required
+                />
+                <span className="sm-captcha-challenge">
+                  {captcha.a} + {captcha.b} = ?
+                </span>
+                <button
+                  type="button"
+                  className="sm-captcha-refresh"
+                  onClick={refreshCaptcha}
+                  aria-label="Refresh captcha"
+                  title="Get a new question"
+                >
+                  <RefreshCw size={15} />
+                </button>
+              </div>
+            </div>
+
+            {formError && <div className="sm-form-error">{formError}</div>}
+            {sendState === "success" && (
+              <div className="sm-form-success">
+                Message sent — thanks for reaching out! I'll reply as soon as I can.
+              </div>
+            )}
+            {sendState === "error" && (
+              <div className="sm-form-error">
+                Something went wrong sending the message. Please try again or email me directly.
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="sm-btn primary sm-form-submit"
+              disabled={sendState === "sending"}
+            >
+              {sendState === "sending" ? (
+                <>
+                  <Loader2 size={15} className="sm-spin" /> Sending...
+                </>
+              ) : (
+                <>
+                  <Send size={15} /> Send Message
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </section>
 
      <div className="sm-footer">

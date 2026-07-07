@@ -1,133 +1,330 @@
-
 import { useState, useEffect, useRef } from "react";
-import { Bot, Send, Sparkles, X } from "lucide-react";
+import {
+    Bot,
+    Send,
+    Sparkles,
+    X
+} from "lucide-react";
+
 import "./chatbot.css";
 
-const KNOWLEDGE = {
-  about: "I'm Sohum AI. Ask me about Sohum's projects, AWS skills, DevOps experience, resume or contact information.",
-  projects: "NeuroVision, Dockerized Full Stack CI/CD, Python AI Automation Pipeline.",
-  aws: "EC2, IAM, VPC, Route53, Lambda, ECS, CloudWatch, Docker, Terraform, GitHub Actions, EKS (learning).",
-  resume: "Use the Resume button on the portfolio to download the latest resume."
+const AI_DATA = {
+    projects:
+        "I've built NeuroVision, an AI Facial Analysis Platform using Flask, TensorFlow, OpenCV, SQLite and MTCNN. I've also built a Dockerized Full Stack application with CI/CD and a Python Automation Pipeline.",
+
+    aws:
+        "I have hands-on experience with EC2, IAM, VPC, Route53, Lambda, CloudWatch, ECS, Docker, Terraform, GitHub Actions and I'm currently learning Kubernetes & EKS.",
+
+    devops:
+        "My DevOps stack includes Docker, GitHub Actions, Linux, Python, Terraform, Prometheus, Grafana and AWS.",
+
+    neurovision:
+        "NeuroVision is an AI-powered facial analysis platform capable of predicting age and gender using Deep Learning. It is built using Flask, TensorFlow, OpenCV, SQLite and MTCNN.",
+
+    education:
+        "Bachelor of Computer Applications (BCA) focused on Software Development, AI, Deep Learning and Cloud Technologies.",
+
+    contact:
+        "📧 sohummp@gmail.com\n📱 +91 94809 66591\n📍 Bengaluru, India",
+
+    resume:
+        "You can download Sohum's resume directly from the Resume button on this portfolio.",
+
+    about:
+        "I'm Sohum M P, an AWS Cloud & DevOps Engineer passionate about automation, scalable cloud infrastructure and AI applications.",
+
+    default:
+        "I couldn't find an exact answer. Try asking about Projects, AWS, DevOps, NeuroVision, Resume, Education or Contact."
 };
 
 export default function ChatBot() {
-  const [open,setOpen]=useState(false);
-  const [typing,setTyping]=useState(false);
-  const [input,setInput]=useState("");
-  const [messages,setMessages]=useState([
-    {role:"assistant",content:KNOWLEDGE.about}
-  ]);
 
-  const wrapRef=useRef(null);
-  const bottomRef=useRef(null);
+    const [open, setOpen] = useState(false);
 
-  useEffect(()=>{
-    bottomRef.current?.scrollIntoView({behavior:"smooth"});
-  },[messages,typing]);
+    const [input, setInput] = useState("");
 
-  useEffect(()=>{
-    function outside(e){
-      if(open && wrapRef.current && !wrapRef.current.contains(e.target)){
-        setOpen(false);
-      }
+    const [typing, setTyping] = useState(false);
+
+    const [messages, setMessages] = useState([
+        {
+            sender: "bot",
+            text:
+`Hello 👋
+
+I'm Sohum AI.
+
+I've been trained on Sohum's portfolio.
+
+Ask me anything about
+
+• Projects
+• AWS
+• DevOps
+• Resume
+• Education
+• Contact`
+        }
+    ]);
+
+    const chatRef = useRef(null);
+
+    const bottomRef = useRef(null);
+
+    useEffect(() => {
+
+        bottomRef.current?.scrollIntoView({
+            behavior: "smooth"
+        });
+
+    }, [messages, typing]);
+
+    useEffect(() => {
+
+        function close(e){
+
+            if(
+                open &&
+                chatRef.current &&
+                !chatRef.current.contains(e.target)
+            ){
+                setOpen(false);
+            }
+
+        }
+
+        document.addEventListener("mousedown", close);
+
+        return ()=>document.removeEventListener("mousedown", close);
+
+    },[open]);
+
+    function getReply(question){
+
+        const q=question.toLowerCase();
+
+        if(q.includes("project")) return AI_DATA.projects;
+
+        if(q.includes("aws")) return AI_DATA.aws;
+
+        if(q.includes("devops")) return AI_DATA.devops;
+
+        if(q.includes("docker")) return AI_DATA.devops;
+
+        if(q.includes("terraform")) return AI_DATA.devops;
+
+        if(q.includes("neuro")) return AI_DATA.neurovision;
+
+        if(q.includes("education")) return AI_DATA.education;
+
+        if(q.includes("resume")) return AI_DATA.resume;
+
+        if(q.includes("contact")) return AI_DATA.contact;
+
+        if(q.includes("about")) return AI_DATA.about;
+
+        return AI_DATA.default;
+
     }
-    document.addEventListener("mousedown",outside);
-    return ()=>document.removeEventListener("mousedown",outside);
-  },[open]);
 
-  function lookup(q){
-    q=q.toLowerCase();
-    if(q.includes("project")) return KNOWLEDGE.projects;
-    if(q.includes("aws")) return KNOWLEDGE.aws;
-    if(q.includes("resume")) return KNOWLEDGE.resume;
-    return "That's a great question. Connect me to an OpenAI or Gemini API and I'll answer naturally using Sohum's portfolio.";
-  }
+    function sendMessage(custom){
 
-  function streamReply(text){
-    let i=0;
-    setMessages(m=>[...m,{role:"assistant",content:""}]);
+        const question = custom || input;
 
-    const timer=setInterval(()=>{
-      i++;
-      setMessages(prev=>{
-        const copy=[...prev];
-        copy[copy.length-1]={
-          ...copy[copy.length-1],
-          content:text.slice(0,i)
+        if(!question.trim()) return;
+
+        const userMessage={
+            sender:"user",
+            text:question
         };
-        return copy;
-      });
-      if(i>=text.length){
-        clearInterval(timer);
-        setTyping(false);
-      }
-    },18);
-  }
 
-  function send(custom){
-    const q=(custom||input).trim();
-    if(!q) return;
+        setMessages(prev=>[
+            ...prev,
+            userMessage
+        ]);
 
-    setMessages(m=>[...m,{role:"user",content:q}]);
-    setInput("");
-    setTyping(true);
-  }
+        setInput("");
 
-  useEffect(()=>{
-    if(!typing) return;
-    const last=messages[messages.length-1];
-    if(last?.role!=="user") return;
-    const id=setTimeout(()=>{
-      streamReply(lookup(last.content));
-    },800);
-    return ()=>clearTimeout(id);
-  },[typing]);
+        setTyping(true);
 
-  const prompts=["Projects","AWS","Resume"];
+        setTimeout(()=>{
 
-  return (
-    <div ref={wrapRef}>
-      <button className="chat-toggle" onClick={()=>setOpen(v=>!v)}>
-        <Sparkles size={28}/>
-      </button>
+            setTyping(false);
 
-      {open && (
-        <div className="chat-window">
-          <div className="chat-header">
-            <div className="ai-avatar"><Bot size={22}/></div>
-            <div className="ai-info">
-              <div className="ai-title">Sohum AI</div>
-              <div className="ai-status"><span className="status-dot"/>Online</div>
-            </div>
-            <button className="close-btn" onClick={()=>setOpen(false)}><X size={18}/></button>
-          </div>
+            setMessages(prev=>[
+                ...prev,
+                {
+                    sender:"bot",
+                    text:getReply(question)
+                }
+            ]);
 
-          <div className="chat-body">
-            <div className="suggestions">
-              {prompts.map(p=><button key={p} onClick={()=>send(p)}>{p}</button>)}
-            </div>
+        },1200);
 
-            {messages.map((m,i)=>(
-              <div key={i} className={`msg ${m.role==="user"?"user":"bot"}`}>
-                {m.content}
-              </div>
-            ))}
+    }
 
-            {typing && <div className="msg bot"><div className="typing"><span/><span/><span/></div></div>}
-            <div ref={bottomRef}/>
-          </div>
+    const suggestions=[
+        "Projects",
+        "AWS Skills",
+        "DevOps",
+        "NeuroVision",
+        "Resume"
+    ];
 
-          <div className="chat-footer">
-            <input
-              value={input}
-              onChange={e=>setInput(e.target.value)}
-              onKeyDown={e=>e.key==="Enter" && send()}
-              placeholder="Ask anything..."
-            />
-            <button onClick={()=>send()}><Send size={18}/></button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    return(
+
+<div ref={chatRef}>
+
+<button
+className="chat-toggle"
+onClick={()=>setOpen(!open)}
+>
+
+<Sparkles size={28}/>
+
+</button>
+
+{open && (
+
+<div className="chat-window">
+
+<div className="chat-header">
+
+<div className="ai-avatar">
+
+<Bot size={24}/>
+
+</div>
+
+<div className="ai-info">
+
+<div className="ai-title">
+
+Sohum AI
+
+</div>
+
+<div className="ai-status">
+
+<span className="status-dot"></span>
+
+Online • AI Assistant
+
+</div>
+
+</div>
+
+<button
+className="close-btn"
+onClick={()=>setOpen(false)}
+>
+
+<X size={18}/>
+
+</button>
+
+</div>
+
+<div className="chat-body">
+
+<div className="suggestions">
+
+{suggestions.map(s=>(
+
+<button
+key={s}
+onClick={()=>sendMessage(s)}
+>
+
+{s}
+
+</button>
+
+))}
+
+</div>
+
+{messages.map((msg,index)=>(
+
+<div
+key={index}
+className={`msg ${msg.sender}`}
+>
+
+{msg.text}
+
+<div className="time">
+
+{new Date().toLocaleTimeString([],{
+hour:"2-digit",
+minute:"2-digit"
+})}
+
+</div>
+
+</div>
+
+))}
+
+{typing && (
+
+<div className="msg bot">
+
+<div className="typing">
+
+<span></span>
+
+<span></span>
+
+<span></span>
+
+</div>
+
+</div>
+
+)}
+
+<div ref={bottomRef}></div>
+
+</div>
+
+<div className="chat-footer">
+
+<input
+
+value={input}
+
+placeholder="Ask anything..."
+
+onChange={(e)=>setInput(e.target.value)}
+
+onKeyDown={(e)=>{
+
+if(e.key==="Enter"){
+
+sendMessage();
+
+}
+
+}}
+
+/>
+
+<button
+onClick={()=>sendMessage()}
+>
+
+<Send size={18}/>
+
+</button>
+
+</div>
+
+</div>
+
+)}
+
+</div>
+
+);
+
 }
