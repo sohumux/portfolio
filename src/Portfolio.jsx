@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import emailjs from "@emailjs/browser";
+import ReCAPTCHA from "react-google-recaptcha";
 import ChatBot from "./components/ChatBot";
 import {
   Terminal,
@@ -17,19 +18,29 @@ import {
   Dot,
   Send,
   Loader2,
-  RefreshCw,
 } from "lucide-react";
 
 // ---- EmailJS config ----
-// 1. Create a free account at https://www.emailjs.com/
-// 2. Add an Email Service (e.g. Gmail) -> copy the Service ID
-// 3. Create an Email Template with variables: {{from_name}}, {{from_email}}, {{message}}
-//    -> copy the Template ID
-// 4. Account -> General -> copy your Public Key
-// 5. Paste the three values below.
-const EMAILJS_SERVICE_ID = "service_34rcdle";
-const EMAILJS_TEMPLATE_ID = "template_wpwb8aa";
-const EMAILJS_PUBLIC_KEY = "MdLtvTlbQJ_rMz3lN";
+// Values are read from environment variables so real keys never sit in source
+// control. Create a `.env` file in your project root (see `.env.example`)
+// with the three variables below, then restart your dev server.
+//
+// Vite projects: variable names MUST be prefixed with VITE_ and are read via
+// import.meta.env. If you're on Create React App instead, prefix them with
+// REACT_APP_ and read them via process.env.REACT_APP_... — swap the three
+// lines below accordingly.
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+// ---- reCAPTCHA config ----
+// 1. Go to https://www.google.com/recaptcha/admin/create
+// 2. Register a site, choose "reCAPTCHA v2 -> I'm not a robot checkbox"
+// 3. Add your domain(s) (and "localhost" for local dev)
+// 4. Copy the "Site Key" (public, safe for the client) into VITE_RECAPTCHA_SITE_KEY
+//    in your .env file. The "Secret Key" is NOT used here — real server-side
+//    verification requires a backend, which this static form doesn't have.
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
 const SECTIONS = [
   { id: "home", label: "PROFILE", icon: Terminal },
@@ -297,12 +308,6 @@ function useTypewriter(lines, active) {
     done: lineIndex >= lines.length,
   };
 }
-function generateCaptcha() {
-  const a = Math.floor(Math.random() * 10) + 1;
-  const b = Math.floor(Math.random() * 10) + 1;
-  return { a, b, answer: a + b };
-}
-
 export default function Portfolio() {
   const [active, setActive] = useState("home");
   const refs = useRef({});
@@ -312,14 +317,14 @@ export default function Portfolio() {
 
   // ---- Contact form state ----
   const [form, setForm] = useState({ name: "", email: "", message: "" });
-  const [captcha, setCaptcha] = useState(generateCaptcha);
-  const [captchaInput, setCaptchaInput] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState(null);
+  const recaptchaRef = useRef(null);
   const [sendState, setSendState] = useState("idle"); // idle | sending | success | error
   const [formError, setFormError] = useState("");
 
-  const refreshCaptcha = useCallback(() => {
-    setCaptcha(generateCaptcha());
-    setCaptchaInput("");
+  const resetRecaptcha = useCallback(() => {
+    recaptchaRef.current?.reset();
+    setRecaptchaToken(null);
   }, []);
 
   const handleFormChange = (e) => {
@@ -336,9 +341,15 @@ export default function Portfolio() {
       return;
     }
 
-    if (parseInt(captchaInput, 10) !== captcha.answer) {
-      setFormError("Captcha answer is incorrect — please try again.");
-      refreshCaptcha();
+    if (!recaptchaToken) {
+      setFormError("Please complete the reCAPTCHA check before sending.");
+      return;
+    }
+
+    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
+      setFormError(
+        "Email isn't configured yet — add VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID and VITE_EMAILJS_PUBLIC_KEY to your .env file."
+      );
       return;
     }
 
@@ -352,17 +363,18 @@ export default function Portfolio() {
           from_name: form.name,
           from_email: form.email,
           message: form.message,
+          "g-recaptcha-response": recaptchaToken,
         },
         { publicKey: EMAILJS_PUBLIC_KEY }
       );
 
       setSendState("success");
       setForm({ name: "", email: "", message: "" });
-      refreshCaptcha();
+      resetRecaptcha();
     } catch (err) {
       console.error("EmailJS send failed:", err);
       setSendState("error");
-      refreshCaptcha();
+      resetRecaptcha();
     }
   };
 
@@ -817,7 +829,7 @@ const fillPct =
         /* CONTACT */
         .sm-contact-console{
     max-width:850px;
-    margin:40px auto 0;
+    margin:40px 0 0;
     background:#111a2e;
     border:1px solid var(--border);
     border-radius:12px;
@@ -837,8 +849,9 @@ const fillPct =
 
 .sm-console-row{
     display:flex;
-    justify-content:space-between;
+    justify-content:flex-start;
     align-items:center;
+    gap:16px;
     padding:18px 24px;
     border-bottom:1px solid rgba(255,255,255,.05);
 }
@@ -874,119 +887,7 @@ const fillPct =
     font-family:var(--mono);
 }
 
-/* CONTACT FORM */
-.sm-contact-form{
-    max-width:850px;
-    margin:24px auto 0;
-    background:#111a2e;
-    border:1px solid var(--border);
-    border-radius:12px;
-    overflow:hidden;
-    box-shadow:0 20px 50px rgba(0,0,0,.35);
-}
-
-.sm-form-body{
-    padding:24px;
-    display:flex;
-    flex-direction:column;
-    gap:16px;
-}
-
-.sm-form-row{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:16px;
-}
-@media (max-width:600px){ .sm-form-row{ grid-template-columns:1fr; } }
-
-.sm-form-field{ display:flex; flex-direction:column; gap:6px; }
-
-.sm-form-field label{
-    font-family:var(--mono);
-    font-size:11.5px;
-    letter-spacing:1px;
-    color:var(--muted);
-}
-
-.sm-form-field input,
-.sm-form-field textarea{
-    background:var(--bg-panel-alt);
-    border:1px solid var(--border-soft);
-    border-radius:8px;
-    padding:11px 13px;
-    color:var(--text);
-    font-family:var(--sans);
-    font-size:14px;
-    resize:vertical;
-    transition:border-color .2s ease;
-}
-
-.sm-form-field input:focus,
-.sm-form-field textarea:focus{
-    outline:none;
-    border-color:var(--mint);
-}
-
-.sm-captcha-row{
-    display:flex;
-    align-items:flex-end;
-    gap:12px;
-    flex-wrap:wrap;
-}
-
-.sm-captcha-challenge{
-    font-family:var(--mono);
-    font-size:13px;
-    color:var(--mint);
-    background:var(--bg-panel-alt);
-    border:1px solid var(--border-soft);
-    border-radius:8px;
-    padding:11px 14px;
-    white-space:nowrap;
-}
-
-.sm-captcha-refresh{
-    background:transparent;
-    border:1px solid var(--border-soft);
-    border-radius:8px;
-    color:var(--muted);
-    padding:11px;
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    transition:.2s;
-}
-.sm-captcha-refresh:hover{ color:var(--mint); border-color:var(--mint); }
-
-.sm-form-error{
-    font-family:var(--mono);
-    font-size:12.5px;
-    color:#ff8080;
-    background:rgba(255,95,87,0.08);
-    border:1px solid rgba(255,95,87,0.25);
-    border-radius:8px;
-    padding:10px 14px;
-}
-
-.sm-form-success{
-    font-family:var(--mono);
-    font-size:12.5px;
-    color:var(--mint);
-    background:rgba(94,234,212,0.08);
-    border:1px solid rgba(94,234,212,0.25);
-    border-radius:8px;
-    padding:10px 14px;
-}
-
-.sm-form-submit{
-    align-self:flex-start;
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-}
-
-.sm-spin{ animation: sm-spin 1s linear infinite; }
-@keyframes sm-spin { to { transform: rotate(360deg); } }
+/* CONTACT FORM styling now handled via Tailwind utility classes in the JSX */
 
 .status-dot{
     width:10px;
@@ -1020,7 +921,7 @@ const fillPct =
         .sm-contact-value { font-size: 14px; font-weight: 600; word-break: break-word; }
 
         .sm-footer {
-          text-align: center;
+          text-align: left;
           padding: 30px 24px 50px;
           font-family: var(--mono);
           font-size: 12px;
@@ -1254,12 +1155,19 @@ const fillPct =
   </div>
 </div>
 
-        <form className="sm-contact-form" onSubmit={handleContactSubmit}>
-          <div className="sm-console-header">SEND A MESSAGE</div>
-          <div className="sm-form-body">
-            <div className="sm-form-row">
-              <div className="sm-form-field">
-                <label htmlFor="sm-name">NAME</label>
+        <form
+          className="max-w-[850px] mt-6 bg-[#111a2e] border border-white/10 rounded-xl overflow-hidden shadow-2xl"
+          onSubmit={handleContactSubmit}
+        >
+          <div className="px-6 py-4 border-b border-white/10 font-mono text-xs tracking-widest text-slate-400">
+            SEND A MESSAGE
+          </div>
+          <div className="p-6 flex flex-col gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="sm-name" className="font-mono text-[11px] tracking-wide text-slate-400">
+                  NAME
+                </label>
                 <input
                   id="sm-name"
                   name="name"
@@ -1269,10 +1177,13 @@ const fillPct =
                   onChange={handleFormChange}
                   placeholder="Your name"
                   required
+                  className="bg-slate-900/60 border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-300 transition-colors"
                 />
               </div>
-              <div className="sm-form-field">
-                <label htmlFor="sm-email">EMAIL</label>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="sm-email" className="font-mono text-[11px] tracking-wide text-slate-400">
+                  EMAIL
+                </label>
                 <input
                   id="sm-email"
                   name="email"
@@ -1282,12 +1193,15 @@ const fillPct =
                   onChange={handleFormChange}
                   placeholder="you@example.com"
                   required
+                  className="bg-slate-900/60 border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-300 transition-colors"
                 />
               </div>
             </div>
 
-            <div className="sm-form-field">
-              <label htmlFor="sm-message">MESSAGE</label>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="sm-message" className="font-mono text-[11px] tracking-wide text-slate-400">
+                MESSAGE
+              </label>
               <textarea
                 id="sm-message"
                 name="message"
@@ -1296,59 +1210,53 @@ const fillPct =
                 onChange={handleFormChange}
                 placeholder="Tell me a bit about the role or project..."
                 required
+                className="bg-slate-900/60 border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-300 transition-colors resize-y"
               />
             </div>
 
-            <div className="sm-form-field">
-              <label htmlFor="sm-captcha">
-                CAPTCHA — what is {captcha.a} + {captcha.b}?
+            <div className="flex flex-col gap-1.5">
+              <label className="font-mono text-[11px] tracking-wide text-slate-400">
+                VERIFY YOU'RE HUMAN
               </label>
-              <div className="sm-captcha-row">
-                <input
-                  id="sm-captcha"
-                  type="number"
-                  inputMode="numeric"
-                  value={captchaInput}
-                  onChange={(e) => setCaptchaInput(e.target.value)}
-                  placeholder="Your answer"
-                  style={{ maxWidth: 160 }}
-                  required
+              {RECAPTCHA_SITE_KEY ? (
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={RECAPTCHA_SITE_KEY}
+                  theme="dark"
+                  onChange={(token) => setRecaptchaToken(token)}
+                  onExpired={() => setRecaptchaToken(null)}
                 />
-                <span className="sm-captcha-challenge">
-                  {captcha.a} + {captcha.b} = ?
-                </span>
-                <button
-                  type="button"
-                  className="sm-captcha-refresh"
-                  onClick={refreshCaptcha}
-                  aria-label="Refresh captcha"
-                  title="Get a new question"
-                >
-                  <RefreshCw size={15} />
-                </button>
-              </div>
+              ) : (
+                <div className="font-mono text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3.5 py-2.5">
+                  reCAPTCHA isn't configured — add VITE_RECAPTCHA_SITE_KEY to your .env file.
+                </div>
+              )}
             </div>
 
-            {formError && <div className="sm-form-error">{formError}</div>}
+            {formError && (
+              <div className="font-mono text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3.5 py-2.5">
+                {formError}
+              </div>
+            )}
             {sendState === "success" && (
-              <div className="sm-form-success">
+              <div className="font-mono text-xs text-emerald-300 bg-emerald-400/10 border border-emerald-400/25 rounded-lg px-3.5 py-2.5">
                 Message sent — thanks for reaching out! I'll reply as soon as I can.
               </div>
             )}
             {sendState === "error" && (
-              <div className="sm-form-error">
+              <div className="font-mono text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3.5 py-2.5">
                 Something went wrong sending the message. Please try again or email me directly.
               </div>
             )}
 
             <button
               type="submit"
-              className="sm-btn primary sm-form-submit"
               disabled={sendState === "sending"}
+              className="self-start inline-flex items-center gap-2 bg-emerald-300 text-slate-900 font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-emerald-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {sendState === "sending" ? (
                 <>
-                  <Loader2 size={15} className="sm-spin" /> Sending...
+                  <Loader2 size={15} className="animate-spin" /> Sending...
                 </>
               ) : (
                 <>
