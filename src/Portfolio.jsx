@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import emailjs from "@emailjs/browser";
 import ReCAPTCHA from "react-google-recaptcha";
 import ChatBot from "./components/ChatBot";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import {
   Terminal,
   Cloud,
