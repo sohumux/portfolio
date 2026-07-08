@@ -20,27 +20,17 @@ import {
   Loader2,
 } from "lucide-react";
 
-// ---- EmailJS config ----
-// Values are read from environment variables so real keys never sit in source
-// control. Create a `.env` file in your project root (see `.env.example`)
-// with the three variables below, then restart your dev server.
-//
-// Vite projects: variable names MUST be prefixed with VITE_ and are read via
-// import.meta.env. If you're on Create React App instead, prefix them with
-// REACT_APP_ and read them via process.env.REACT_APP_... — swap the three
-// lines below accordingly.
+
 const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
 const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
-// ---- reCAPTCHA config ----
-// 1. Go to https://www.google.com/recaptcha/admin/create
-// 2. Register a site, choose "reCAPTCHA v2 -> I'm not a robot checkbox"
-// 3. Add your domain(s) (and "localhost" for local dev)
-// 4. Copy the "Site Key" (public, safe for the client) into VITE_RECAPTCHA_SITE_KEY
-//    in your .env file. The "Secret Key" is NOT used here — real server-side
-//    verification requires a backend, which this static form doesn't have.
+
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
+// Path to your profile picture. Drop the image file into your `public`
+// folder (e.g. `public/profile.jpg`) and update this path if needed.
+const PROFILE_IMAGE_SRC = "/profile.jpeg";
 
 const SECTIONS = [
   { id: "home", label: "PROFILE", icon: Terminal },
@@ -613,6 +603,54 @@ const fillPct =
           .sm-hero { grid-template-columns: 1fr; min-height: unset; padding-top: 120px; }
         }
 
+        /* PROFILE AVATAR */
+        .sm-avatar-wrap {
+          position: relative;
+          width: 96px;
+          height: 96px;
+          margin-bottom: 22px;
+        }
+        .sm-avatar {
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          object-fit: cover;
+          display: block;
+          border: 2px solid var(--mint);
+          box-shadow:
+            0 0 0 4px rgba(94, 234, 212, 0.14),
+            0 10px 30px rgba(0, 0, 0, 0.45);
+          background: var(--bg-panel-alt);
+        }
+        .sm-avatar-fallback {
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: var(--mono);
+          font-weight: 700;
+          font-size: 30px;
+          color: var(--mint);
+          background: var(--bg-panel-alt);
+          border: 2px solid var(--mint);
+          box-shadow:
+            0 0 0 4px rgba(94, 234, 212, 0.14),
+            0 10px 30px rgba(0, 0, 0, 0.45);
+        }
+        .sm-avatar-status {
+          position: absolute;
+          bottom: 2px;
+          right: 2px;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: var(--mint);
+          border: 3px solid var(--bg);
+          box-shadow: 0 0 8px rgba(94, 234, 212, 0.8);
+        }
+
         .sm-hero-title {
           font-size: clamp(32px, 5vw, 52px);
           font-weight: 800;
@@ -962,6 +1000,22 @@ const fillPct =
 
       <section id="home" ref={(el) => (refs.current.home = el)} className="sm-section sm-hero">
         <div>
+          <div className="sm-avatar-wrap">
+            <img
+              src={PROFILE_IMAGE_SRC}
+              alt="Sohum M P"
+              className="sm-avatar"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                e.currentTarget.nextSibling.style.display = "flex";
+              }}
+            />
+            {/* Shown automatically if profile.jpg is missing */}
+            <div className="sm-avatar-fallback" style={{ display: "none" }}>
+              SM
+            </div>
+            <span className="sm-avatar-status" />
+          </div>
           <div className="sm-hero-sub">// aws cloud & devops engineer</div>
           <h1 className="sm-hero-title">
             Sohum M P builds<br />infrastructure that <span>deploys itself</span>
